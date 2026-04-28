@@ -1154,7 +1154,39 @@ render_tiles_loop_2:
 9:	cmp r0,#255		@modify
 	bxne lr
 	add r_tnum,r_tnum,#2
-	
+
+	@ MMC2 latch triggers happen on PPU CHR fetches of specific tiles (FD/FE).
+	@ Trigger once per tile during decode to approximate real PPU fetch behavior.
+	ldrb_ r0,mapper_number
+	cmp r0,#9
+	cmpne r0,#10
+	bne 0f
+	ldr r1,=0x00FD
+	cmp tilenum,r1
+	beq 8f
+	ldr r1,=0x00FE
+	cmp tilenum,r1
+	beq 7f
+	ldr r1,=0x01FD
+	cmp tilenum,r1
+	beq 6f
+	ldr r1,=0x01FE
+	cmp tilenum,r1
+	beq 5f
+	b 0f
+8:	ldr r0,=0x0FD8
+	bl_long2 mapper9_latch
+	b 0f
+7:	ldr r0,=0x0FE8
+	bl_long2 mapper9_latch
+	b 0f
+6:	ldr r0,=0x1FD8
+	bl_long2 mapper9_latch
+	b 0f
+5:	ldr r0,=0x1FE8
+	bl_long2 mapper9_latch
+0:
+
 	and tilenum,tilenum,#0x3F
 	ldr agbptr,[sp]
 	add agbptr,agbptr,tilenum,lsl#5
@@ -3743,6 +3775,50 @@ dm11:
 	cmp r0,#239
 	bhi dm10				@skip if sprite Y>239
 
+	@ MMC2: sprite pattern fetches can flip the latch (FD/FE).
+	@ For 8x8 sprites, the pattern table base comes from PPUCTRL bit 3 (ppuctrl0frame & 0x08):
+	@   base=0x0000 => use $0FD8/$0FE8
+	@   base=0x1000 => use $1FD8/$1FE8
+	ldrb_ r1,mapper_number
+	cmp r1,#9
+	cmpne r1,#10
+	bne 0f
+	and r1,r3,#0xFF00
+	cmp r1,#0xFD00
+	beq 1f
+	cmp r1,#0xFE00
+	beq 2f
+	b 0f
+1:	@ r0 = 0x0FD8
+	mov r0,#0xFD
+	lsl r0,r0,#4
+	add r0,r0,#8
+	@ if sprite table base is 0x1000, add 0x1000 -> 0x1FD8
+	ldrb_ r1,ppuctrl0frame
+	tst r1,#0x08
+	beq 3f
+	mov r2,#1
+	lsl r2,r2,#12
+	add r0,r0,r2
+3:
+	bl_long2 mapper9_latch
+	b 0f
+2:	@ r0 = 0x0FE8
+	mov r0,#0xFE
+	lsl r0,r0,#4
+	add r0,r0,#8
+	@ if sprite table base is 0x1000, add 0x1000 -> 0x1FE8
+	ldrb_ r1,ppuctrl0frame
+	tst r1,#0x08
+	beq 4f
+	mov r2,#1
+	lsl r2,r2,#12
+	add r0,r0,r2
+4:
+	bl_long2 mapper9_latch
+	b 0f
+0:
+
 @	spr_ptable=(scrollbuff[spr_y*4]&0x80)/0x20;
 @	spr_t=oambuff[i*4+1];
 @	spr_high_t=spr_t>>6;
@@ -3817,6 +3893,49 @@ dm12:
 	and r0,r3,#0xff
 	cmp r0,#239
 	bhi dm13				@skip if sprite Y>239
+
+	@ MMC2: sprite pattern fetches can flip the latch (FD/FE).
+	@ For 8x16 sprites, the pattern table base comes from tile bit 0 (PPU ignores PPUCTRL bit 3):
+	@   base = (tile & 1) ? 0x1000 : 0x0000
+	@ The PPU fetches two tiles: (tile & 0xFE) and (tile & 0xFE)+1.
+	@ This means latch triggers can occur when (tile & 0xFE) == 0xFC (hits FD) or 0xFE (hits FE).
+	ldrb_ r1,mapper_number
+	cmp r1,#9
+	cmpne r1,#10
+	bne 0f
+	@ r1 = tile number (0..255)
+	and r1,r3,#0x0000FF00
+	mov r1,r1,lsr#8
+	@ r2 = base (0x0000 or 0x1000)
+	mov r2,#0
+	tst r1,#1
+	beq 5f
+	mov r2,#1
+	lsl r2,r2,#12
+5:
+	@ r1 = (tile & 0xFE)
+	bic r1,r1,#1
+	@ (tile&0xFE)==0xFC -> FD latch; ==0xFE -> FE latch
+	cmp r1,#0xFC
+	beq 1f
+	cmp r1,#0xFE
+	beq 2f
+	b 0f
+1:	@ r0 = 0x0FD8 + base
+	mov r0,#0xFD
+	lsl r0,r0,#4
+	add r0,r0,#8
+	add r0,r0,r2
+	bl_long2 mapper9_latch
+	b 0f
+2:	@ r0 = 0x0FE8 + base
+	mov r0,#0xFE
+	lsl r0,r0,#4
+	add r0,r0,#8
+	add r0,r0,r2
+	bl_long2 mapper9_latch
+	b 0f
+0:
 
 	@new code
 	and r4,r0,#0xF8

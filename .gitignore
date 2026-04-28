@@ -1,0 +1,12 @@
+# Build artifacts
+/build/
+/build_mb/
+
+# Common outputs
+*.o
+*.d
+*.elf
+*.map
+*.gba
+*.sav
+
