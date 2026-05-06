@@ -7,6 +7,7 @@ MAPPER_OVERLAY_TEXT(4)
 	global_func mapper10init
 	global_func mapper9BGcheck
 	global_func mapper9_latch
+	global_func mapper9_sync
 @	global_func mapper_9_hook
 
  reg0 = mapperdata+0
@@ -16,6 +17,7 @@ MAPPER_OVERLAY_TEXT(4)
  lolatch = mapperdata+4 @0=FD, 1=FE (PPU $0000-$0FFF)
  hilatch = mapperdata+5 @0=FD, 1=FE (PPU $1000-$1FFF)
  prgsel  = mapperdata+6 @PRG bank select ($A000-$AFFF), 8KB units (mask differs for 9 vs 10)
+ need_sync = mapperdata+7 @bit0: lo half dirty, bit1: hi half dirty
 @----------------------------------------------------------------------------
 mapper9init:	@MMC2 (iNES mapper 9)
 @----------------------------------------------------------------------------
@@ -157,6 +159,14 @@ a000_prg_10:
 @----------------------------------------------------------------------------
 mapper9_latch:
 	stmfd sp!,{lr}
+	mov r3,r0					@ preserve triggering PPU address for debug
+	@ debug: record every call + last addr (even if latch doesn't change)
+	ldr r1,=mmc2_call_cnt
+	ldr r2,[r1]
+	add r2,r2,#1
+	str r2,[r1]
+	ldr r1,=mmc2_last_addr
+	strh r3,[r1]
 	@ Low table latch triggers:
 	@  $0FD8 -> FD (0)
 	@  $0FE8 -> FE (1)
@@ -173,23 +183,35 @@ mapper9_latch:
 	ldrb_ r1,lolatch
 	cmp r1,#0
 	ldmeqfd sp!,{pc}
+	@ debug: count + last addr
+	ldr r0,=mmc2_lo_cnt
+	ldr r1,[r0]
+	add r1,r1,#1
+	str r1,[r0]
+	ldr r0,=mmc2_last_addr
+	strh r3,[r0]
 	mov r1,#0
 	strb_ r1,lolatch
-	blx_long mapper9_latch_invalidate_sprites
-	blx_long mapper9_latch_invalidate_chr_cache
-	ldrb_ r0,reg0
-	bl_long chr0123_
+	ldrb_ r0,need_sync
+	orr r0,r0,#1
+	strb_ r0,need_sync
 	ldmfd sp!,{pc}
 3:	@ set lo latch = FE
 	ldrb_ r1,lolatch
 	cmp r1,#1
 	ldmeqfd sp!,{pc}
+	@ debug: count + last addr
+	ldr r0,=mmc2_lo_cnt
+	ldr r1,[r0]
+	add r1,r1,#1
+	str r1,[r0]
+	ldr r0,=mmc2_last_addr
+	strh r3,[r0]
 	mov r1,#1
 	strb_ r1,lolatch
-	blx_long mapper9_latch_invalidate_sprites
-	blx_long mapper9_latch_invalidate_chr_cache
-	ldrb_ r0,reg1
-	bl_long chr0123_
+	ldrb_ r0,need_sync
+	orr r0,r0,#1
+	strb_ r0,need_sync
 	ldmfd sp!,{pc}
 1:
 	@ High table latch triggers:
@@ -214,23 +236,67 @@ mapper9_latch:
 	ldrb_ r1,hilatch
 	cmp r1,#0
 	ldmeqfd sp!,{pc}
+	@ debug: count + last addr
+	ldr r0,=mmc2_hi_cnt
+	ldr r1,[r0]
+	add r1,r1,#1
+	str r1,[r0]
+	ldr r0,=mmc2_last_addr
+	strh r3,[r0]
 	mov r1,#0
 	strb_ r1,hilatch
-	blx_long mapper9_latch_invalidate_sprites
-	blx_long mapper9_latch_invalidate_chr_cache
-	ldrb_ r0,reg2
-	bl_long chr4567_
+	ldrb_ r0,need_sync
+	orr r0,r0,#2
+	strb_ r0,need_sync
 	ldmfd sp!,{pc}
 7:	@ set hi latch = FE
 	ldrb_ r1,hilatch
 	cmp r1,#1
 	ldmeqfd sp!,{pc}
+	@ debug: count + last addr
+	ldr r0,=mmc2_hi_cnt
+	ldr r1,[r0]
+	add r1,r1,#1
+	str r1,[r0]
+	ldr r0,=mmc2_last_addr
+	strh r3,[r0]
 	mov r1,#1
 	strb_ r1,hilatch
+	ldrb_ r0,need_sync
+	orr r0,r0,#2
+	strb_ r0,need_sync
+	ldmfd sp!,{pc}
+
+@----------------------------------------------------------------------------
+@ mapper9_sync: apply pending latch changes at safe time (VBlank)
+@----------------------------------------------------------------------------
+mapper9_sync:
+	stmfd sp!,{lr}
+	ldrb_ r0,need_sync
+	movs r0,r0
+	ldmeqfd sp!,{pc}
+	mov r1,#0
+	strb_ r1,need_sync
 	blx_long mapper9_latch_invalidate_sprites
 	blx_long mapper9_latch_invalidate_chr_cache
-	ldrb_ r0,reg3
+	@ Apply low half if needed (bit0)
+	tst r0,#1
+	beq 1f
+	ldrb_ r1,lolatch
+	cmp r1,#0
+	ldreqb_ r0,reg0
+	ldrneb_ r0,reg1
+	bl_long chr0123_
+1:
+	@ Apply high half if needed (bit1)
+	tst r0,#2
+	beq 2f
+	ldrb_ r1,hilatch
+	cmp r1,#0
+	ldreqb_ r0,reg2
+	ldrneb_ r0,reg3
 	bl_long chr4567_
+2:
 	ldmfd sp!,{pc}
 @@------------------------------
 @mapper_9_hook:

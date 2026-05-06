@@ -779,6 +779,137 @@ db1:
 	tst r2,#15
 	bne db1
 
+	@ MMC2/MMC4 latch debug (once per second, UI on right)
+	@ Shows whether mapper9_latch is actually firing and what address class triggered last.
+	ldrb_ r0,mapper_number
+	cmp r0,#9
+	cmpne r0,#10
+	bxne lr
+	ldr r2,=DEBUGSCREEN
+	add r2,r2,#64				@ one tilemap row below FPS
+	.if REDUCED_FONT
+	ldr r12,=0x4000+298-32-10
+	.else
+	ldr r12,=0x4000+298-32
+	.endif
+	@ fill in hex digits in-place (lo/hi counts + last addr)
+	ldr r1,=mmc2_lo_cnt
+	ldr r1,[r1]
+	ldr r3,=mmc2_hi_cnt
+	ldr r3,[r3]
+	ldr r4,=mmc2_last_addr
+	ldrh r4,[r4]
+	ldr r6,=mmc2_call_cnt
+	ldr r6,[r6]
+	ldr r5,=hexdigits
+
+	@ -------- line 1: MMC2 C/L/H --------
+	ldr r0,=mmc2text1
+	@ call count (lowest 16 bits) -> positions 7..10
+	mov r7,r6
+	lsr r7,r7,#12
+	and r7,r7,#0xF
+	ldrb r7,[r5,r7]
+	strb r7,[r0,#7]
+	mov r7,r6
+	lsr r7,r7,#8
+	and r7,r7,#0xF
+	ldrb r7,[r5,r7]
+	strb r7,[r0,#8]
+	mov r7,r6
+	lsr r7,r7,#4
+	and r7,r7,#0xF
+	ldrb r7,[r5,r7]
+	strb r7,[r0,#9]
+	and r7,r6,#0xF
+	ldrb r7,[r5,r7]
+	strb r7,[r0,#10]
+	@ lo latch flip count -> positions 14..17
+	mov r6,r1
+	lsr r6,r6,#12
+	and r6,r6,#0xF
+	ldrb r6,[r5,r6]
+	strb r6,[r0,#14]
+	mov r6,r1
+	lsr r6,r6,#8
+	and r6,r6,#0xF
+	ldrb r6,[r5,r6]
+	strb r6,[r0,#15]
+	mov r6,r1
+	lsr r6,r6,#4
+	and r6,r6,#0xF
+	ldrb r6,[r5,r6]
+	strb r6,[r0,#16]
+	and r6,r1,#0xF
+	ldrb r6,[r5,r6]
+	strb r6,[r0,#17]
+	@ hi latch flip count -> positions 21..24
+	mov r6,r3
+	lsr r6,r6,#12
+	and r6,r6,#0xF
+	ldrb r6,[r5,r6]
+	strb r6,[r0,#21]
+	mov r6,r3
+	lsr r6,r6,#8
+	and r6,r6,#0xF
+	ldrb r6,[r5,r6]
+	strb r6,[r0,#22]
+	mov r6,r3
+	lsr r6,r6,#4
+	and r6,r6,#0xF
+	ldrb r6,[r5,r6]
+	strb r6,[r0,#23]
+	and r6,r3,#0xF
+	ldrb r6,[r5,r6]
+	strb r6,[r0,#24]
+	@ draw line1 (25 chars)
+	mov r7,#25
+db1_mmc2_l1:
+	ldrb r1,[r0],#1
+	.if REDUCED_FONT
+	cmp r1,#' '
+	addeq r1,r1,#'*'-' '
+	.endif
+	add r1,r1,r12
+	strh r1,[r2],#2
+	subs r7,r7,#1
+	bne db1_mmc2_l1
+
+	@ -------- line 2: MMC2 A --------
+	ldr r0,=mmc2text2
+	add r2,r2,#(64-25*2)		@ next row, col 0
+	@ last addr -> positions 7..10
+	mov r6,r4
+	lsr r6,r6,#12
+	and r6,r6,#0xF
+	ldrb r6,[r5,r6]
+	strb r6,[r0,#7]
+	mov r6,r4
+	lsr r6,r6,#8
+	and r6,r6,#0xF
+	ldrb r6,[r5,r6]
+	strb r6,[r0,#8]
+	mov r6,r4
+	lsr r6,r6,#4
+	and r6,r6,#0xF
+	ldrb r6,[r5,r6]
+	strb r6,[r0,#9]
+	and r6,r4,#0xF
+	ldrb r6,[r5,r6]
+	strb r6,[r0,#10]
+	@ draw line2 (11 chars)
+	mov r7,#11
+db1_mmc2_l2:
+	ldrb r1,[r0],#1
+	.if REDUCED_FONT
+	cmp r1,#' '
+	addeq r1,r1,#'*'-' '
+	.endif
+	add r1,r1,r12
+	strh r1,[r2],#2
+	subs r7,r7,#1
+	bne db1_mmc2_l2
+
 	bx lr
 @@----------------------------------------------------------------------------
 @debug_:		@debug output, r0=val, r1=line, r2=used.
@@ -817,6 +948,20 @@ db1:
 @----------------------------------------------------------------------------
 @this stuff can't be in rom!
 fpstext: .ascii "FPS:    "
+	.global mmc2_lo_cnt
+	.global mmc2_hi_cnt
+	.global mmc2_last_addr
+	.global mmc2_call_cnt
+mmc2text: .ascii "MMC2 C:0000 L:0000 H:0000 A:0000"
+	.align
+mmc2_call_cnt: .word 0
+mmc2_lo_cnt: .word 0
+mmc2_hi_cnt: .word 0
+mmc2_last_addr: .hword 0
+	.hword 0
+mmc2text1: .ascii "MMC2 C:0000 L:0000 H:0000"
+mmc2text2: .ascii "MMC2 A:0000"
+hexdigits: .ascii "0123456789ABCDEF"
 fpsenabled: .byte 0
 fpschk:	.byte 0
 gammavalue: .byte 0
@@ -2232,6 +2377,50 @@ sprite_zero_handler_2:
 	tst r3,#0x10
 	addne r4,r4,#0x100
 	addne r5,r5,#0x100
+
+	@ MMC2/MMC4: latch triggers are caused by pattern table reads at $?FD8/$?FE8.
+	@ This sprite-0 hit path performs real pattern fetches; notify mapper here.
+	ldrb_ r0,mapper_number
+	cmp r0,#9
+	cmpne r0,#10
+	bne 9f
+	stmfd sp!,{r1,r2,lr}
+	@ tile r4
+	ldr r1,=0x00FD
+	cmp r4,r1
+	ldreq r0,=0x0FD8
+	bleq_long2 mapper9_latch
+	ldr r1,=0x00FE
+	cmp r4,r1
+	ldreq r0,=0x0FE8
+	bleq_long2 mapper9_latch
+	ldr r1,=0x01FD
+	cmp r4,r1
+	ldreq r0,=0x1FD8
+	bleq_long2 mapper9_latch
+	ldr r1,=0x01FE
+	cmp r4,r1
+	ldreq r0,=0x1FE8
+	bleq_long2 mapper9_latch
+	@ tile r5
+	ldr r1,=0x00FD
+	cmp r5,r1
+	ldreq r0,=0x0FD8
+	bleq_long2 mapper9_latch
+	ldr r1,=0x00FE
+	cmp r5,r1
+	ldreq r0,=0x0FE8
+	bleq_long2 mapper9_latch
+	ldr r1,=0x01FD
+	cmp r5,r1
+	ldreq r0,=0x1FD8
+	bleq_long2 mapper9_latch
+	ldr r1,=0x01FE
+	cmp r5,r1
+	ldreq r0,=0x1FE8
+	bleq_long2 mapper9_latch
+	ldmfd sp!,{r1,r2,lr}
+9:
 	
 	adr_ addy,vram_map  @nametables
 	mov r3,r4,lsr#6
@@ -3012,6 +3201,16 @@ skipdma:
 	movs r0,r0
 	beq 0f
 	
+	@ MMC2/MMC4: apply any pending latch-driven CHR changes at a safe point (VBlank)
+	ldrb_ r0,mapper_number
+	cmp r0,#9
+	beq 1f
+	cmp r0,#10
+	bne 2f
+1:
+	bl_long2 mapper9_sync
+2:
+
 	bl update_sprites
 	bl_long vrom_update_tiles
 	.if DIRTYTILES
@@ -4763,6 +4962,31 @@ writeBG_mapper_9_checks_:
 	cmp addy,#0x3C0
 	bge_long writeBG_mapper_9_mod_return
 	stmfd sp!,{r0,r2,addy,lr}
+	@ MMC2/MMC4 latch hook: use BG tile stream as fetch source.
+	@ Real hardware triggers on pattern fetches at $?FD8/$?FE8.
+	@ Here, when a $FD/$FE tile is written to the nametable, notify the mapper.
+	cmp r0,#0xFD
+	beq 9f
+	cmp r0,#0xFE
+	bne 8f
+	@ $FE -> base + 0x0FE8
+	mov r0,#0xFE
+	lsl r0,r0,#4
+	add r0,r0,#8
+	ldrb_ r1,ppuctrl0
+	tst r1,#0x10
+	addne r0,r0,#0x1000
+	bl_long2 mapper9_latch
+	b 8f
+9:	@ $FD -> base + 0x0FD8
+	mov r0,#0xFD
+	lsl r0,r0,#4
+	add r0,r0,#8
+	ldrb_ r1,ppuctrl0
+	tst r1,#0x10
+	addne r0,r0,#0x1000
+	bl_long2 mapper9_latch
+8:
 	add addy,addy,addy
 	bl_long mapper9BGcheck
 	ldmfd sp!,{r0,r2,addy,lr}
@@ -4792,6 +5016,34 @@ writeBG:		@loadcart jumps here
 		cmp r1,#9
 		cmpne r1,#10
 		bxne lr
+		@ Treat this as a potential MMC2/MMC4 latch-trigger tile.
+		@ Real hardware triggers on pattern fetches at $?FD8/$?FE8; PocketNES lacks
+		@ per-pixel fetches, so use the nametable tile stream as the event source.
+		stmfd sp!,{r0,lr}
+		cmp r0,#0xFD
+		beq 0f
+		cmp r0,#0xFE
+		beq 1f
+		b 2f
+0:	@ build addr = (PPUCTRL BG base ? 0x1000 : 0x0000) + 0x0FD8
+		mov r0,#0xFD
+		lsl r0,r0,#4
+		add r0,r0,#8
+		ldrb_ r1,ppuctrl0
+		tst r1,#0x10
+		addne r0,r0,#0x1000
+		bl_long2 mapper9_latch
+		b 2f
+1:	@ build addr = (PPUCTRL BG base ? 0x1000 : 0x0000) + 0x0FE8
+		mov r0,#0xFE
+		lsl r0,r0,#4
+		add r0,r0,#8
+		ldrb_ r1,ppuctrl0
+		tst r1,#0x10
+		addne r0,r0,#0x1000
+		bl_long2 mapper9_latch
+2:
+		ldmfd sp!,{r0,lr}
 		b_long mapper9BGcheck
 writeattrib:
 	stmfd sp!,{r3,r4,lr}
