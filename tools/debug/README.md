@@ -1,49 +1,23 @@
 # PocketNES automated GDB capture (mGBA)
 
-This folder contains a **one-command** debug harness that:
-
-- launches mGBA with its **GDB server enabled**
-- connects `arm-none-eabi-gdb` to it
-- dumps a small set of **PocketNES/MMC2-relevant state** to a timestamped log
+See `tools/README.md` for canonical commands.
 
 Important behavior note:
 
 - When mGBA is launched with `-g`, it will typically **wait for GDB** before emulation (audio/video) begins.
 - This harness works around that by doing a fast first attach that issues **`continue` + `detach`** so emulation starts immediately, then it waits a bit and re-attaches to **interrupt + dump** state.
 
-## Requirements
+## Notes
 
-- mGBA 0.10.5 (or compatible) executable path
-- `arm-none-eabi-gdb.exe` (from devkitARM) available via `DEVKITARM` or on `PATH`
-- `arm-none-eabi-nm.exe` available (used to resolve symbol addresses from `pocketnes.elf`)
+Runs are written to:
 
-## Usage
+- `tools/debug/runs/<runId>/gdb_out.txt`
+- `tools/debug/runs/<runId>/mgba_stdout.txt`
+- `tools/debug/runs/<runId>/mgba_stderr.txt`
+- `tools/debug/runs/<runId>/summary.json`
+- `tools/debug/runs/<runId>/summary.md`
 
-From PowerShell:
+## Parsing an existing run folder
 
-```powershell
-.\tools\debug\run_mgba_gdb.ps1
-```
-
-Common overrides:
-
-```powershell
-.\tools\debug\run_mgba_gdb.ps1 `
-  -InitialDelaySeconds 1 `
-  -CaptureDelaySeconds 5 `
-  -MaxAttempts 10
-```
-
-Override mGBA path / ROM / ELF if needed:
-
-```powershell
-.\tools\debug\run_mgba_gdb.ps1 `
-  -MgbaExe "X:\games\emu\gba\mGBA-0.10.5-win32\mgba-sdl.exe" `
-  -Rom "C:\Users\benedict\Documents\GitHub\PocketNES\PocketNESMenu.gba" `
-  -Elf "C:\Users\benedict\Documents\GitHub\PocketNES\pocketnes.elf"
-```
-
-Logs are written to:
-
-- `tools/debug/logs/gdb_out_YYYYMMDD_HHMMSS.txt`
+Use `python tools/debug/pocketnes_parse_run.py --run-dir tools/debug/runs/<runId>`.
 

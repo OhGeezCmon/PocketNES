@@ -171,7 +171,7 @@ mapper9_latch:
 	ldmeqfd sp!,{pc}
 	mov r1,#0
 	strb_ r1,lolatch
-	bl_long init_sprite_cache
+	blx_long init_sprite_cache
 	ldrb_ r0,reg0
 	bl_long chr0123_
 	ldmfd sp!,{pc}
@@ -181,7 +181,7 @@ mapper9_latch:
 	ldmeqfd sp!,{pc}
 	mov r1,#1
 	strb_ r1,lolatch
-	bl_long init_sprite_cache
+	blx_long init_sprite_cache
 	ldrb_ r0,reg1
 	bl_long chr0123_
 	ldmfd sp!,{pc}
@@ -210,7 +210,7 @@ mapper9_latch:
 	ldmeqfd sp!,{pc}
 	mov r1,#0
 	strb_ r1,hilatch
-	bl_long init_sprite_cache
+	blx_long init_sprite_cache
 	ldrb_ r0,reg2
 	bl_long chr4567_
 	ldmfd sp!,{pc}
@@ -220,7 +220,7 @@ mapper9_latch:
 	ldmeqfd sp!,{pc}
 	mov r1,#1
 	strb_ r1,hilatch
-	bl_long init_sprite_cache
+	blx_long init_sprite_cache
 	ldrb_ r0,reg3
 	bl_long chr4567_
 	ldmfd sp!,{pc}
