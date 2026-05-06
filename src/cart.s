@@ -13,6 +13,8 @@
 
 	@IMPORT findrom @from main.c
 	@IMPORT init_sprite_cache
+	@IMPORT mapper9_latch_invalidate_sprites
+	@IMPORT mapper9_latch_invalidate_chr_cache
 	@IMPORT init_cache
 	@IMPORT loadcart
 	

@@ -29,12 +29,14 @@ map10start:
 @	ldr r0,=mapper_9_hook
 @	str_ r0,scanlinehook
 
-	@ Default latches = FD
-	mov r0,#0
+	@ Power-on latch state is undefined on hardware; match Mesen/FCEUX:
+	@ both halves start in FE -> CHR comes from reg1 (low) / reg3 (high).
+	mov r0,#1
 	strb_ r0,lolatch
 	strb_ r0,hilatch
 
 	@ Default PRG select = 0
+	mov r0,#0
 	strb_ r0,prgsel
 
 	@ PRG layout (MMC2 / mapper 9): $8000 switchable 8KB, $A000-$FFFF fixed to last 3 banks.
@@ -53,6 +55,13 @@ map10start:
 	@ last-1
 	mov r0,r3
 	bl_long mapEF_
+	@ Apply CHR for active latched banks (reg1/reg3 at reset; games overwrite soon).
+	ldrb_ r0,reg1
+	stmfd sp!,{lr}
+	bl_long chr0123_
+	ldrb_ r0,reg3
+	bl_long chr4567_
+	ldmfd sp!,{lr}
 	ldmfd sp!,{pc}
 @----------------------------------------------------------------------------
 mapper10init:
@@ -80,13 +89,12 @@ b000: @-------------------------
 	and r0,r0,#0x1F
 	strb_ r0,reg0
 	ldrb_ r1,lolatch
-	tst r1,#0xFF
-	bne 0f
+	cmp r1,#0
+	ldreqb_ r0,reg0
+	ldrneb_ r0,reg1
 	stmfd sp!,{lr}
 	bl_long chr0123_
 	ldmfd sp!,{pc}
-0:
-	mov pc,lr
 c000: @-------------------------
 	tst addy,#0x1000
 	bne d000
@@ -94,25 +102,22 @@ c000: @-------------------------
 	and r0,r0,#0x1F
 	strb_ r0,reg1
 	ldrb_ r1,lolatch
-	tst r1,#0xFF
-	beq 0f
+	cmp r1,#0
+	ldreqb_ r0,reg0
+	ldrneb_ r0,reg1
 	stmfd sp!,{lr}
 	bl_long chr0123_
 	ldmfd sp!,{pc}
-0:
-	mov pc,lr
-	@mov pc,lr
 d000: @-------------------------
 	and r0,r0,#0x1F
 	strb_ r0,reg2
 	ldrb_ r1,hilatch
-	tst r1,#0xFF
-	bne 0f
+	cmp r1,#0
+	ldreqb_ r0,reg2
+	ldrneb_ r0,reg3
 	stmfd sp!,{lr}
 	bl_long chr4567_
 	ldmfd sp!,{pc}
-0:
-	mov pc,lr
 e000: @-------------------------
 	tst addy,#0x1000
 	bne f000
@@ -120,13 +125,12 @@ e000: @-------------------------
 	and r0,r0,#0x1F
 	strb_ r0,reg3
 	ldrb_ r1,hilatch
-	tst r1,#0xFF
-	beq 0f
+	cmp r1,#0
+	ldreqb_ r0,reg2
+	ldrneb_ r0,reg3
 	stmfd sp!,{lr}
 	bl_long chr4567_
 	ldmfd sp!,{pc}
-0:
-	mov pc,lr
 f000: @-------------------------
 	tst r0,#1
 	b_long mirror2V_
@@ -171,7 +175,8 @@ mapper9_latch:
 	ldmeqfd sp!,{pc}
 	mov r1,#0
 	strb_ r1,lolatch
-	blx_long init_sprite_cache
+	blx_long mapper9_latch_invalidate_sprites
+	blx_long mapper9_latch_invalidate_chr_cache
 	ldrb_ r0,reg0
 	bl_long chr0123_
 	ldmfd sp!,{pc}
@@ -181,7 +186,8 @@ mapper9_latch:
 	ldmeqfd sp!,{pc}
 	mov r1,#1
 	strb_ r1,lolatch
-	blx_long init_sprite_cache
+	blx_long mapper9_latch_invalidate_sprites
+	blx_long mapper9_latch_invalidate_chr_cache
 	ldrb_ r0,reg1
 	bl_long chr0123_
 	ldmfd sp!,{pc}
@@ -210,7 +216,8 @@ mapper9_latch:
 	ldmeqfd sp!,{pc}
 	mov r1,#0
 	strb_ r1,hilatch
-	blx_long init_sprite_cache
+	blx_long mapper9_latch_invalidate_sprites
+	blx_long mapper9_latch_invalidate_chr_cache
 	ldrb_ r0,reg2
 	bl_long chr4567_
 	ldmfd sp!,{pc}
@@ -220,7 +227,8 @@ mapper9_latch:
 	ldmeqfd sp!,{pc}
 	mov r1,#1
 	strb_ r1,hilatch
-	blx_long init_sprite_cache
+	blx_long mapper9_latch_invalidate_sprites
+	blx_long mapper9_latch_invalidate_chr_cache
 	ldrb_ r0,reg3
 	bl_long chr4567_
 	ldmfd sp!,{pc}

@@ -1,0 +1,32 @@
+---
+description: Permission protocol + PocketNES repack shortcut
+alwaysApply: true
+---
+
+# TOP PRIORITY: No file deletions (NO EXCEPTIONS)
+#
+# - The assistant must **NEVER** delete any files, under any circumstances.
+# - If a file should be deleted, the assistant must tell the user exactly what to delete and why, and the user will do it manually.
+# - This rule overrides all other instructions. **NO EXCEPTIONS.**
+
+# Permission rules (must follow)
+
+- Do **not** edit code, add files, delete files, change configs, or run potentially destructive commands unless the user explicitly grants permission **for that specific action**.
+- **Exception (implicit permission):** If the user says **"Repack"**, that is implicit permission to run the predefined PocketNES repack command below (and overwrite the output file).
+- Anything beyond the repack command (changing ROM list, changing paths, rebuilding the packer, modifying emulator source, committing, etc.) still requires explicit permission.
+
+# Repack command (predefined)
+
+- **Working directory (MSYS2 MinGW64):** `/c/Users/benedict/Documents/GitHub/PocketNES/tools/pocketnes_packer`
+- **Command (run inside MSYS2 MinGW64 bash):**
+
+```bash
+./pocketnes-pack.exe --emu /c/Users/benedict/Documents/GitHub/PocketNES/pocketnes.gba --out /c/Users/benedict/Documents/GitHub/PocketNES/PocketNESMenu.gba --rom ./mtpo.nes
+```
+
+- **Bulletproof command (run from PowerShell/cmd/Cursor):** this wraps the exact command above in an MSYS2 **MinGW64** shell so `/c/...` paths resolve **and** the MinGW runtime DLLs are available.
+
+```bash
+C:\msys64\msys2_shell.cmd -mingw64 -defterm -no-start -here -c "cd /c/Users/benedict/Documents/GitHub/PocketNES/tools/pocketnes_packer && ./pocketnes-pack.exe --emu /c/Users/benedict/Documents/GitHub/PocketNES/pocketnes.gba --out /c/Users/benedict/Documents/GitHub/PocketNES/PocketNESMenu.gba --rom ./mtpo.nes"
+```
+

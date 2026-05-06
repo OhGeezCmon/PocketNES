@@ -1,5 +1,7 @@
 #include "includes.h"
 
+extern vu32 alreadylooked;
+
 int sprite_cache_cursor=0;
 int sprite_cache_size=0;
 
@@ -29,20 +31,48 @@ void init_sprite_cache()
 	sprite_cache_cursor=0;
 	sprite_cache_size=0;
 
+	/* Invalidate sprite drawing fast-path (see need_to_fetch_sprite_data in ppu.s).
+	   Mapper/PPU paths may call init_sprite_cache mid-frame (e.g. MMC2 latch). */
+	alreadylooked = 1;
+}
+
+void mapper9_latch_invalidate_sprites(void)
+{
+	/* MMC2/MMC4 CHR latch changed active banks — sprite cache indices are stale.
+	   Called from mapper overlay many times per frame; keep this lighter than
+	   init_sprite_cache() (no memset of spr_cache / spr_cache_disp): recache_sprites
+	   refills spr_cache when sprite_cache_size was reset to 0. */
+	memset32(spr_cache_map, 0xFFFFFFFF, 256);
+	sprite_cache_cursor = 0;
+	sprite_cache_size = 0;
+	/* Re-arm sprite cache rebuild (need_to_fetch_sprite_data checks this). */
+	alreadylooked = 1;
+}
+
+void mapper9_latch_invalidate_chr_cache(void)
+{
+	/* MMC2/MMC4 latch changes which CHR pages are visible.  PocketNES renders from
+	   a decoded tile cache, so force CHR tiles to be re-decoded to match the new
+	   mapping. Correctness first; we can optimize later (e.g., only the affected
+	   4KB half). */
+	memset32(dirty_tiles, 0xFFFFFFFF, 512);
+	memset32(dirty_rows, 0xFFFFFFFF, 32);
 }
 
 //called from IRQ code
 int add_if_needed(int count,u8 *base,int addthis)
 {
 	int i;
-	for (i=0;i<count;i++)
+	/* base is only MAX bytes; count can exceed MAX when many distinct banks are
+	   requested — never read past base[MAX-1]. */
+	for (i=0;i<count && i<MAX;i++)
 	{
 		if (base[i]==addthis) return count;
 	}
-	if (i<MAX)
+	if (count<MAX)
 	{
-		base[i]=addthis;
-		return i+1;
+		base[count]=addthis;
+		return count+1;
 	}
 	return count;
 }
@@ -50,7 +80,7 @@ int add_if_needed(int count,u8 *base,int addthis)
 static bool search(int count, u8 *base, int lookforthis)
 {
 	int i;
-	for (i=0;i<count;i++)
+	for (i=0;i<count && i<MAX;i++)
 	{
 		if (base[i]==lookforthis) return true;
 	}
@@ -144,7 +174,9 @@ void recache_sprites()
 	{
 		requestcount=MAX-keepcount;
 	}
-	while (requestcount)
+	int stuck = 0;
+	int part2_guard = 0;
+	while (requestcount && part2_guard++ < 512)
 	{
 		//is page at cursor discardable?
 		int currentpage;
@@ -161,15 +193,24 @@ void recache_sprites()
 		
 		if (notdiscardable)
 		{
-			//not discardable
-			//skip that page
-			sprite_cache_cursor++;
-			if (sprite_cache_cursor>=MAX)
+			stuck++;
+			if (stuck<MAX)
 			{
-				sprite_cache_cursor-=MAX;
+				sprite_cache_cursor++;
+				if (sprite_cache_cursor>=MAX)
+				{
+					sprite_cache_cursor-=MAX;
+				}
+				continue;
 			}
+			/* All eight slots hold banks on the keep list — rotate forever otherwise. */
+			stuck = 0;
 		}
 		else
+		{
+			stuck = 0;
+		}
+		
 		{
 			int newpage;
 			//discardable

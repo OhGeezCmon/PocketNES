@@ -12,8 +12,13 @@ Canonical entrypoints:
 Run a deterministic capture (creates a new `tools/debug/runs/<runId>/` folder and writes `summary.json` / `summary.md`):
 
 ```bash
-python tools/debug/pocketnes_debug.py --kill-existing-mgba --no-window
+python tools/debug/pocketnes_debug.py --no-window
 ```
+
+Tips:
+
+- The harness caps wall time via `--max-total-seconds` (default **22**) and avoids hanging forever on stuck GDB attaches via `--gdb-batch-timeout-seconds`.
+- By default, it **terminates any running `mGBA.exe`** before starting. To disable that, pass `--no-clean-mgba`.
 
 Parse an existing run folder:
 

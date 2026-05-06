@@ -41,7 +41,11 @@ def parse_run_dir(run_dir: Path) -> tuple[Path, Path]:
     cpsr = m1(r"^\s*cpsr\s+(0x[0-9a-fA-F]+)")
 
     bt = None
-    m = re.search(r"^\s*#0[\s\S]*?(?=^\s*--- disasm @pc ---|\Z)", text, flags=re.MULTILINE)
+    m = re.search(
+        r"^\s*#0[\s\S]*?(?=^\s*detach\b|^\s*disconnect\b|^\s*--- disasm @pc ---|\Z)",
+        text,
+        flags=re.MULTILINE | re.IGNORECASE,
+    )
     if m:
         bt = m.group(0).strip()
 

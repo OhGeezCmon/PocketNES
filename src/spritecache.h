@@ -7,6 +7,8 @@ extern "C" {
 
 extern int sprite_cache_cursor;
 void init_sprite_cache(void);
+void mapper9_latch_invalidate_sprites(void);
+void mapper9_latch_invalidate_chr_cache(void);
 int add_if_needed(int count,u8 *base,int addthis);
 void recache_sprites(void);
 

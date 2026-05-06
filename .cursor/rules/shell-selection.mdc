@@ -1,0 +1,11 @@
+---
+description: Shell selection hygiene (PowerShell vs cmd vs MSYS2)
+alwaysApply: true
+---
+
+# Shell selection rule (must follow)
+
+- **Default to Command Prompt semantics** for running commands from the agent to reduce quoting/escaping issues and keep behavior consistent.
+- **Only use PowerShell** when invoking **PowerShell scripts (`.ps1`) that the agent created/maintains** (e.g. `tools/debug/run_mgba_gdb.ps1`), or when the user explicitly asks to use PowerShell.
+- For MSYS2/MinGW64 workflows, prefer running `C:\msys64\msys2_shell.cmd -mingw64 ... -c "<command>"` rather than trying to emulate MSYS path semantics from PowerShell.
+
